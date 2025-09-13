@@ -16,16 +16,46 @@ parts/
 sdist/
 var/
 wheels/
+share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
 MANIFEST
 
 # Virtual environments
-venv/
+.env
+.venv
 env/
+venv/
 ENV/
-.venv/
+env.bak/
+venv.bak/
+
+# uv
+uv.lock
+.uv/
+
+# Testing
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+htmlcov/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
 
 # IDE
 .vscode/
@@ -33,21 +63,6 @@ ENV/
 *.swp
 *.swo
 *~
-
-# Data directories
-data/
-d4j_data/
-*.json
-*.jsonl
-
-# Temporary files
-tmp/
-temp/
-.tmp/
-
-# Logs
-*.log
-logs/
 
 # OS
 .DS_Store
@@ -58,15 +73,19 @@ logs/
 ehthumbs.db
 Thumbs.db
 
-# Defects4J checkout directories
-defects4j-*
-d4j_*
+# Logs
+*.log
 
-# Coverage reports
-htmlcov/
-.coverage
-.coverage.*
-coverage.xml
-*.cover
-.hypothesis/
-.pytest_cache/
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Ruff
+.ruff_cache/
+
+# Project specific
+/data/
+/output/
+/temp/
+*.tmp

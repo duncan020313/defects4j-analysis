@@ -1,0 +1,139 @@
+# Project dependencies and tool configuration
+[project]
+name = "defects4j-analysis"
+version = "0.1.0"
+description = "Tool for analyzing Defects4J dataset and extracting bug patterns"
+requires-python = ">=3.8"
+
+# Core dependencies
+dependencies = [
+    "tree-sitter>=0.20.0",
+    "tree-sitter-languages>=1.8.0", 
+    "orjson>=3.8.0",
+]
+
+# Tool configuration
+[tool.uv]
+dev-dependencies = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0", 
+    "pytest-xdist>=3.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+    "pre-commit>=3.0.0",
+]
+
+# Ruff configuration
+[tool.ruff]
+target-version = "py38"
+line-length = 88
+indent-width = 4
+
+[tool.ruff.lint]
+# Enable common linting rules
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # Pyflakes
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "I",    # isort
+    "N",    # pep8-naming
+    "C4",   # flake8-comprehensions
+    "PIE",  # flake8-pie
+    "T20",  # flake8-print
+    "RET",  # flake8-return
+    "ARG",  # flake8-unused-arguments
+    "PTH",  # flake8-use-pathlib
+    "ERA",  # eradicate
+]
+
+# Rules to ignore
+ignore = [
+    "E501",    # Line too long (handled by formatter)
+    "T201",    # Print statements (useful for debugging)
+    "ARG002",  # Unused method argument
+    "PTH123",  # Use pathlib instead of os.path.join
+]
+
+# Allow autofix for certain rule types
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.ruff.lint.per-file-ignores]
+# Tests can use assertions and print statements
+"tests/**/*" = ["T201", "S101"]
+# Scripts can use print statements
+"scripts/**/*" = ["T201"]
+# Examples can use print statements
+"examples/**/*" = ["T201"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["defects4j_extractor"]
+
+# MyPy configuration
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = [
+    "tree_sitter.*",
+    "orjson.*",
+]
+ignore_missing_imports = true
+
+# Pytest configuration
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--cov=src",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=xml",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+]
+
+# Coverage configuration
+[tool.coverage.run]
+source = ["src"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
