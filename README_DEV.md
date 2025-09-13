@@ -4,52 +4,51 @@ This project uses modern Python tooling with **uv** for package management and *
 
 ## Quick Start
 
-1. **Install dependencies:**
+1. **Install uv:**
    ```bash
-   # Make sure uv is installed
    curl -LsSf https://astral.sh/uv/install.sh | sh
    export PATH="$HOME/.local/bin:$PATH"
-   
-   # Install project dependencies
-   uv venv
-   uv pip install tree-sitter tree-sitter-languages orjson fastapi uvicorn ruff mypy pytest pytest-cov pytest-xdist
    ```
 
-2. **Activate virtual environment:**
-   ```bash
-   source .venv/bin/activate
-   ```
-
-3. **Run development commands:**
+2. **Run commands directly (no venv activation needed):**
    ```bash
    # Format code
-   python scripts/dev.py format
+   uv run ruff format src/ scripts/ examples/
    
-   # Lint code
-   python scripts/dev.py lint
+   # Check linting
+   uv run ruff check src/ scripts/ examples/
    
-   # Fix linting issues
-   python scripts/dev.py fix
+   # Fix auto-fixable issues
+   uv run ruff check --fix src/ scripts/ examples/
    
    # Run tests
-   python scripts/dev.py test
+   uv run pytest
    
-   # Run all checks
-   python scripts/dev.py check-all
+   # Type checking
+   uv run mypy src/
    ```
 
-## Development Commands
+## Direct uv Commands
 
-The `scripts/dev.py` script provides common development tasks:
+No need to activate virtual environments! uv manages everything:
 
-- `format` - Format code with ruff
-- `format-check` - Check if code is properly formatted  
-- `lint` - Run ruff linter
-- `fix` - Fix linting issues automatically
-- `typecheck` - Run mypy type checking
-- `test` - Run pytest tests
-- `test-cov` - Run tests with coverage report
-- `check-all` - Run all checks (lint, format-check, typecheck, test)
+```bash
+# Linting and formatting
+uv run ruff check src/ scripts/ examples/          # Check for issues
+uv run ruff check --fix src/ scripts/ examples/    # Fix auto-fixable issues  
+uv run ruff format src/ scripts/ examples/         # Format code
+uv run ruff format --check src/ scripts/ examples/ # Check formatting
+
+# Testing and type checking
+uv run pytest                                      # Run tests
+uv run pytest --cov=src --cov-report=html         # Run with coverage
+uv run mypy src/                                   # Type checking
+
+# Install new dependencies
+uv add package-name                                # Add runtime dependency
+uv add --dev package-name                         # Add dev dependency
+uv remove package-name                            # Remove dependency
+```
 
 ## Project Structure
 

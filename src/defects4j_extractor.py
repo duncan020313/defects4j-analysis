@@ -29,10 +29,7 @@ Notes:
 
 from __future__ import annotations
 
-from typing import List, Optional
-
 from defects4j_extractor.cli import main
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

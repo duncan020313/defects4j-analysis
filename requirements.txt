@@ -1,4 +1,0 @@
-# Core dependencies for defects4j_extractor.py
-tree-sitter>=0.20.0
-tree-sitter-languages>=1.8.0
-orjson>=3.8.0

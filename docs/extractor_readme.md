@@ -26,15 +26,15 @@ A Python tool for extracting Java method information and JavaDoc from source cod
 
 ### Prerequisites
 
-- Python 3.7+
+- Python 3.8+
 - Defects4J (for preprocessing mode)
 
 ### Dependencies
 
-Install required Python packages:
+Dependencies are managed through the project's `pyproject.toml`. Run from the project root:
 
 ```bash
-pip install tree-sitter tree-sitter-languages orjson
+uv sync
 ```
 
 For Defects4J integration, ensure Defects4J is installed and available in your PATH:
@@ -52,12 +52,12 @@ The tool provides three main commands: `scan`, `diff`, and `preprocess`.
 Extract all methods from a Java source directory:
 
 ```bash
-python defects4j_extractor.py scan /path/to/java/source --out methods.json
+uv run python src/defects4j_extractor.py scan /path/to/java/source --out methods.json
 ```
 
 Output as JSON Lines:
 ```bash
-python defects4j_extractor.py scan /path/to/java/source --jsonl --out methods.jsonl
+uv run python src/defects4j_extractor.py scan /path/to/java/source --jsonl --out methods.jsonl
 ```
 
 ### 2. Diff Mode - Compare Buggy vs Fixed Versions
@@ -65,7 +65,7 @@ python defects4j_extractor.py scan /path/to/java/source --jsonl --out methods.js
 Compare two source trees and extract only changed methods:
 
 ```bash
-python defects4j_extractor.py diff /path/to/buggy/source /path/to/fixed/source --out changes.json
+uv run python src/defects4j_extractor.py diff /path/to/buggy/source /path/to/fixed/source --out changes.json
 ```
 
 ### 3. Preprocess Mode - Automated Defects4J Processing
@@ -74,20 +74,20 @@ Process multiple Defects4J projects automatically:
 
 ```bash
 # Process all default projects (Lang, Chart, Time, Math, Mockito)
-python defects4j_extractor.py preprocess --out /output/directory
+uv run python src/defects4j_extractor.py preprocess --out /output/directory
 
 # Process specific project with ID range
-python defects4j_extractor.py preprocess --project-only Lang --start-id 1 --end-id 10 --out /output/directory
+uv run python src/defects4j_extractor.py preprocess --project-only Lang --start-id 1 --end-id 10 --out /output/directory
 
 # Use parallel processing
-python defects4j_extractor.py preprocess --jobs 4 --out /output/directory
+uv run python src/defects4j_extractor.py preprocess --jobs 4 --out /output/directory
 ```
 
 ## Command-Line Options
 
 ### Scan Command
 ```
-python defects4j_extractor.py scan <source_directory> [options]
+uv run python src/defects4j_extractor.py scan <source_directory> [options]
 ```
 - `source_directory`: Path to Java source root directory
 - `--out PATH`: Output file path (JSON or JSONL)
@@ -95,7 +95,7 @@ python defects4j_extractor.py scan <source_directory> [options]
 
 ### Diff Command
 ```
-python defects4j_extractor.py diff <buggy_directory> <fixed_directory> [options]
+uv run python src/defects4j_extractor.py diff <buggy_directory> <fixed_directory> [options]
 ```
 - `buggy_directory`: Path to buggy source root
 - `fixed_directory`: Path to fixed source root
@@ -104,7 +104,7 @@ python defects4j_extractor.py diff <buggy_directory> <fixed_directory> [options]
 
 ### Preprocess Command
 ```
-python defects4j_extractor.py preprocess [options]
+uv run python src/defects4j_extractor.py preprocess [options]
 ```
 - `--projects`: Comma-separated list of D4J projects (default: "Lang,Chart,Time,Math,Mockito")
 - `--project-only`: Process only this single project
@@ -169,7 +169,7 @@ Status values:
 ```bash
 # Download and extract Lang project
 git clone https://github.com/apache/commons-lang.git
-python defects4j_extractor.py scan commons-lang/src/main/java --out lang_methods.json
+uv run python src/defects4j_extractor.py scan commons-lang/src/main/java --out lang_methods.json
 ```
 
 ### Compare buggy vs fixed version using Defects4J
@@ -178,14 +178,14 @@ python defects4j_extractor.py scan commons-lang/src/main/java --out lang_methods
 # Manual checkout and comparison
 defects4j checkout -p Lang -v 1b -w /tmp/lang_1_buggy
 defects4j checkout -p Lang -v 1f -w /tmp/lang_1_fixed
-python defects4j_extractor.py diff /tmp/lang_1_buggy /tmp/lang_1_fixed --out lang_1_diff.json
+uv run python src/defects4j_extractor.py diff /tmp/lang_1_buggy /tmp/lang_1_fixed --out lang_1_diff.json
 ```
 
 ### Automated processing of specific bugs
 
 ```bash
 # Process Lang bugs 1-50 with 8 parallel workers
-python defects4j_extractor.py preprocess \
+uv run python src/defects4j_extractor.py preprocess \
     --project-only Lang \
     --start-id 1 \
     --end-id 50 \

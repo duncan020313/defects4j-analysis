@@ -8,15 +8,13 @@ A comprehensive toolkit for extracting, analyzing, and browsing Java method-leve
 # 1. Clone and setup
 git clone <repository-url>
 cd defects4j-analysis
-pip install -r requirements.txt
+uv sync
 
 # 2. Extract Defects4J data (requires Defects4J installation)
-python src/defects4j_extractor.py preprocess --out ./data --projects Lang,Chart
+uv run python src/defects4j_extractor.py preprocess --out ./data --projects Lang,Chart
 
 # 3. Start the web server to browse results
-cd server
-pip install -r requirements.txt
-D4J_DATA_DIR=../data uvicorn main:app --host 0.0.0.0 --port 8000
+D4J_DATA_DIR=./data uv run uvicorn server.main:app --host 0.0.0.0 --port 8000
 
 # 4. Open http://localhost:8000 in your browser
 ```
@@ -57,13 +55,13 @@ A powerful Python tool that uses Tree-sitter to parse Java source code and extra
 **Usage Modes:**
 ```bash
 # Extract all methods from a source tree
-python src/defects4j_extractor.py scan /path/to/java/source --out methods.json
+uv run python src/defects4j_extractor.py scan /path/to/java/source --out methods.json
 
 # Compare buggy vs fixed versions
-python src/defects4j_extractor.py diff /path/to/buggy /path/to/fixed --out changes.json
+uv run python src/defects4j_extractor.py diff /path/to/buggy /path/to/fixed --out changes.json
 
 # Batch process Defects4J projects
-python src/defects4j_extractor.py preprocess --projects Lang,Chart,Time,Math,Mockito --out ./data
+uv run python src/defects4j_extractor.py preprocess --projects Lang,Chart,Time,Math,Mockito --out ./data
 ```
 
 ### 2. Web Browser (`server/`)
@@ -102,25 +100,12 @@ defects4j info
 
 ## 🛠 Installation
 
-### Option 1: Basic Setup
+### Basic Setup
 ```bash
-# Install core dependencies
-pip install -r requirements.txt
+# Install all dependencies (core + development)
+uv sync
 
-# For web server (optional)
-cd server
-pip install -r requirements.txt
-```
-
-### Option 2: Development Setup
-```bash
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-cd server && pip install -r requirements.txt
+# For development work, see README_DEV.md for additional tools
 ```
 
 ## 📖 Usage Examples
@@ -132,7 +117,7 @@ cd server && pip install -r requirements.txt
 git clone https://github.com/apache/commons-lang.git
 
 # Extract all methods
-python src/defects4j_extractor.py scan commons-lang/src/main/java --out lang_methods.json
+uv run python src/defects4j_extractor.py scan commons-lang/src/main/java --out lang_methods.json
 
 # View extraction stats
 echo "Extracted $(jq length lang_methods.json) methods"
@@ -142,7 +127,7 @@ echo "Extracted $(jq length lang_methods.json) methods"
 
 ```bash
 # Process first 10 Lang bugs with 4 parallel workers
-python src/defects4j_extractor.py preprocess \
+uv run python src/defects4j_extractor.py preprocess \
     --project-only Lang \
     --start-id 1 \
     --end-id 10 \
@@ -150,7 +135,7 @@ python src/defects4j_extractor.py preprocess \
     --out ./lang_subset
 
 # Process multiple projects
-python src/defects4j_extractor.py preprocess \
+uv run python src/defects4j_extractor.py preprocess \
     --projects "Lang,Chart,Time" \
     --main-only \
     --out ./defects4j_data
@@ -161,11 +146,10 @@ python src/defects4j_extractor.py preprocess \
 ```bash
 # Set data directory and start server
 export D4J_DATA_DIR=/path/to/extracted/data
-cd server
-uvicorn main:app --host 0.0.0.0 --port 8000
+uv run uvicorn server.main:app --host 0.0.0.0 --port 8000
 
 # Or use a different port
-uvicorn main:app --port 8080
+uv run uvicorn server.main:app --port 8080
 ```
 
 ### Search and Analysis
@@ -220,7 +204,7 @@ curl "http://localhost:8000/api/projects"
 Extract and analyze common bug patterns across projects:
 ```bash
 # Extract all bugs for analysis
-python src/defects4j_extractor.py preprocess --out ./analysis_data
+uv run python src/defects4j_extractor.py preprocess --out ./analysis_data
 
 # Use web interface to search for specific patterns
 # e.g., "null check", "array bounds", "string comparison"
@@ -230,7 +214,7 @@ python src/defects4j_extractor.py preprocess --out ./analysis_data
 Study specific types of changes:
 ```bash
 # Process specific projects
-python src/defects4j_extractor.py preprocess --projects "Math,Lang" --out ./research_data
+uv run python src/defects4j_extractor.py preprocess --projects "Math,Lang" --out ./research_data
 
 # Use API to filter by change type
 curl "http://localhost:8000/api/search?q=return"
@@ -240,7 +224,7 @@ curl "http://localhost:8000/api/search?q=return"
 Create training data for ML models:
 ```bash
 # Extract comprehensive dataset
-python src/defects4j_extractor.py preprocess \
+uv run python src/defects4j_extractor.py preprocess \
     --projects "Lang,Chart,Time,Math,Mockito,Cli,Codec,Collections,Compress,Csv,Gson,JacksonCore,JacksonDatabind,JacksonXml,Jsoup,JxPath" \
     --main-only \
     --force \

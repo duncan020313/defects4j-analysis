@@ -17,7 +17,7 @@ fi
 
 # Extract first 3 bugs from Lang and Chart (quick sample)
 echo "📊 Extracting Lang bugs 1-3..."
-python src/defects4j_extractor.py preprocess \
+uv run python src/defects4j_extractor.py preprocess \
     --project-only Lang \
     --start-id 1 \
     --end-id 3 \
@@ -25,7 +25,7 @@ python src/defects4j_extractor.py preprocess \
     --out "$DATA_DIR"
 
 echo "📊 Extracting Chart bugs 1-2..."
-python src/defects4j_extractor.py preprocess \
+uv run python src/defects4j_extractor.py preprocess \
     --project-only Chart \
     --start-id 1 \
     --end-id 2 \
@@ -40,4 +40,4 @@ echo "Files created:"
 ls -la "$DATA_DIR"/*.json 2>/dev/null || echo "No JSON files found"
 echo ""
 echo "🌐 Start the web server to browse:"
-echo "cd server && D4J_DATA_DIR=../$DATA_DIR uvicorn main:app --port 8000"
+echo "D4J_DATA_DIR=$DATA_DIR uv run uvicorn server.main:app --port 8000"

@@ -9,22 +9,25 @@ echo "🚀 Setting up Defects4J Analysis Suite..."
 
 # Check Python version
 python_version=$(python3 -c 'import sys; print(".".join(map(str, sys.version_info[:2])))')
-required_version="3.7"
+required_version="3.8"
 
-if ! python3 -c "import sys; exit(0 if sys.version_info >= (3, 7) else 1)" 2>/dev/null; then
-    echo "❌ Error: Python 3.7+ required, found Python $python_version"
+if ! python3 -c "import sys; exit(0 if sys.version_info >= (3, 8) else 1)" 2>/dev/null; then
+    echo "❌ Error: Python 3.8+ required, found Python $python_version"
     exit 1
 fi
 
 echo "✅ Python $python_version detected"
 
-# Install core dependencies
-echo "📦 Installing core dependencies..."
-pip3 install -r requirements.txt
+# Check if uv is installed
+if ! command -v uv >/dev/null 2>&1; then
+    echo "❌ Error: uv not found. Please install uv first:"
+    echo "   curl -LsSf https://astral.sh/uv/install.sh | sh"
+    exit 1
+fi
 
-# Install server dependencies
-echo "📦 Installing server dependencies..."
-pip3 install -r server/requirements.txt
+# Install dependencies using uv
+echo "📦 Installing dependencies with uv..."
+uv sync
 
 # Check if Defects4J is available
 if command -v defects4j >/dev/null 2>&1; then
@@ -49,10 +52,10 @@ echo "🎉 Setup complete!"
 echo ""
 echo "Next steps:"
 echo "1. Extract some data:"
-echo "   python src/defects4j_extractor.py preprocess --projects Lang --start-id 1 --end-id 5 --out ./data"
+echo "   uv run python src/defects4j_extractor.py preprocess --projects Lang --start-id 1 --end-id 5 --out ./data"
 echo ""
 echo "2. Start the web server:"
-echo "   cd server && D4J_DATA_DIR=../data uvicorn main:app --host 0.0.0.0 --port 8000"
+echo "   D4J_DATA_DIR=./data uv run uvicorn server.main:app --host 0.0.0.0 --port 8000"
 echo ""
 echo "3. Open http://localhost:8000 in your browser"
 echo ""

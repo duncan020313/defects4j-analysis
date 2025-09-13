@@ -8,24 +8,21 @@ FastAPI server and minimal UI to browse Defects4J method-level changes produced 
 - View per-bug details with JavaDoc and patch diffs (buggy vs fixed)
 
 ### Prerequisites
-- Python 3.9+
-- Install dependencies:
-```bash
-pip install fastapi uvicorn orjson
-```
+- Python 3.8+
+- Dependencies are included in the main project dependencies (run `uv sync` from project root)
 
 ### Data directory
 Set the dataset path via `D4J_DATA_DIR` (defaults to `/root/d4j_data`). Files are expected to be JSON files named like `Lang_1.json`, each containing the output of `defects4j_extractor.py diff`/`preprocess`.
 
 To build the dataset:
 ```bash
-python /root/defects4j_extractor.py preprocess --out /root/d4j_data --projects Lang,Chart,Time,Math,Mockito --main-only
+uv run python src/defects4j_extractor.py preprocess --out /root/d4j_data --projects Lang,Chart,Time,Math,Mockito --main-only
 ```
 
 ### Run the server
 ```bash
 export D4J_DATA_DIR=/root/d4j_data
-uvicorn main:app --host 0.0.0.0 --port 8000
+uv run uvicorn server.main:app --host 0.0.0.0 --port 8000
 ```
 Open `http://localhost:8000` to use the UI.
 
