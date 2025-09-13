@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>Defects4J Browser</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 24px;
+        }
+
+        input,
+        select,
+        button {
+            padding: 8px;
+            margin-right: 8px;
+        }
+
+        .result {
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .mono {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            align-items: start;
+        }
+
+        .card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 12px;
+        }
+
+        pre {
+            background: #fafafa;
+            padding: 4px 8px; /* tighter line spacing */
+            overflow: auto;
+            border-radius: 6px;
+            border: 1px solid #eee;
+            line-height: 1.15;
+        }
+
+        .diff-add {
+            background: #e6ffed;
+        }
+        .diff-del {
+            background: #ffeef0;
+        }
+        .diff-meta {
+            color: #666;
+        }
+        .highlight {
+            box-shadow: 0 0 0 2px #4c9ffe inset;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/java.min.js"></script>
+    <script>
+        async function loadProjects() {
+            const res = await fetch('/api/projects');
+            const projects = await res.json();
+            const sel = document.getElementById('project');
+            sel.innerHTML = '<option value="">All Projects</option>' + projects.map(p => `<option value="${p}">${p}</option>`).join('');
+            await loadAllBugs();
+        }
+        async function doSearch() {
+            const q = document.getElementById('q').value.trim();
+            const project = document.getElementById('project').value;
+            if (!q) return;
+            const params = new URLSearchParams({ q });
+            if (project) params.set('project', project);
+            const res = await fetch('/api/search?' + params.toString());
+            const rows = await res.json();
+            const out = document.getElementById('results');
+            out.innerHTML = rows.map(r => {
+              const key = signatureKey(r.signature || {});
+              return `
+        <div class="result">
+          <div><button onclick="showBug('${r.project}', ${r.bug_id}, '${encodeURIComponent(key)}')">Open</button> <strong>${r.project}-${r.bug_id}</strong> <span class="mono">${r.signature?.file_rel_path || ''}</span></div>
+          <div>${r.signature?.class_qualifier || ''}.${r.signature?.method_name || ''} (${r.status})</div>
+        </div>`;
+            }).join('');
+        }
+        async function loadAllBugs() {
+            const project = document.getElementById('project').value;
+            const url = project ? `/api/all_bugs?project=${encodeURIComponent(project)}` : '/api/all_bugs';
+            const res = await fetch(url);
+            const bugs = await res.json();
+            const out = document.getElementById('buglist');
+            out.innerHTML = bugs.map(b => `
+        <div class="result">
+          <div><button onclick="showBug('${b.project}', ${b.bug_id})">Open</button> <strong>${b.project}-${b.bug_id}</strong> <small>(${b.method_count} methods)</small></div>
+        </div>
+      `).join('');
+        }
+        async function showBug(project, bugId, sigKeyEnc) {
+            const res = await fetch(`/api/bug/${project}/${bugId}/details`);
+            const details = await res.json();
+            const out = document.getElementById('bugdetail');
+            const sigKey = sigKeyEnc ? decodeURIComponent(sigKeyEnc) : null;
+            const sorted = sigKey ? [...details].sort((a,b)=> (signatureKey(a.signature) === sigKey ? -1 : 0) - (signatureKey(b.signature) === sigKey ? -1 : 0)) : details;
+            out.innerHTML = `
+        <div><strong>${project}-${bugId}</strong></div>
+        ${sorted.map(d => {
+          const key = signatureKey(d.signature || {});
+          const highlight = sigKey && key === sigKey ? ' highlight' : '';
+          return `
+          <div class="card${highlight}" style="margin: 8px 0;">
+            <div class="mono">${d.signature?.file_rel_path || ''}</div>
+            <div>${d.signature?.class_qualifier || ''}.${d.signature?.method_name || ''} <small>(${d.status})</small></div>
+            <details open>
+              <summary>JavaDoc (buggy)</summary>
+              <pre class="mono">${escapeHtml(d.javadoc_buggy || '')}</pre>
+            </details>
+            <details open>
+              <summary>Code diff</summary>
+              <pre class="mono">${renderDiff(d.code_diff || '')}</pre>
+              <details>
+                <summary>Buggy / Fixed (full)</summary>
+                <div class="grid">
+                  <div>
+                    <div><small>buggy</small></div>
+                    <pre><code class="language-java">${escapeHtml(d.code_buggy || '')}</code></pre>
+                  </div>
+                  <div>
+                    <div><small>fixed</small></div>
+                    <pre><code class="language-java">${escapeHtml(d.code_fixed || '')}</code></pre>
+                  </div>
+                </div>
+              </details>
+            </details>
+          </div>`;
+        }).join('')}
+      `;
+            if (sigKey) {
+              const target = out.querySelector('.card.highlight');
+              if (target) target.scrollIntoView({behavior:'smooth', block:'start'});
+            }
+            // syntax highlight newly inserted code blocks
+            document.querySelectorAll('pre code.language-java').forEach(el => {
+              try { hljs.highlightElement(el); } catch(e) {}
+            });
+        }
+        function escapeHtml(s) {
+            return (s || '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+        }
+        function renderDiff(diffText) {
+            const lines = (diffText || '').split('\n');
+            return lines.map(line => {
+                let cls = '';
+                if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('@@')) {
+                    cls = 'diff-meta';
+                } else if (line.startsWith('+')) {
+                    cls = 'diff-add';
+                } else if (line.startsWith('-')) {
+                    cls = 'diff-del';
+                }
+                return `<span class="${cls}">${escapeHtml(line)}</span>`;
+            }).join('\n');
+        }
+        function signatureKey(sig) {
+            const p = sig?.file_rel_path || '';
+            const c = sig?.class_qualifier || '';
+            const m = sig?.method_name || '';
+            const a = typeof sig?.arity === 'number' ? sig.arity : '';
+            return `${p}||${c}||${m}||${a}`;
+        }
+        function onProjectChange() {
+            loadAllBugs();
+            document.getElementById('bugdetail').innerHTML = '';
+        }
+        window.addEventListener('DOMContentLoaded', () => { loadProjects(); });
+    </script>
+</head>
+
+<body>
+    <h2>Defects4J Browser</h2>
+    <div>
+        <input id="q" placeholder="Search term (class, method, javadoc, code)" style="width: 420px;" />
+        <select id="project" onchange="onProjectChange()"></select>
+        <button onclick="doSearch()">Search</button>
+    </div>
+    <div class="grid" style="margin-top: 16px;">
+      <div class="card">
+        <h3>All Bugs</h3>
+        <div id="buglist"></div>
+      </div>
+      <div>
+        <h3>Search Results</h3>
+        <div id="results"></div>
+        <h3 style="margin-top: 24px;">Bug Detail</h3>
+        <div id="bugdetail"></div>
+      </div>
+    </div>
+</body>
+
+</html>
