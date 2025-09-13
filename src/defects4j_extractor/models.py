@@ -38,6 +38,21 @@ class MethodInfo:
 
 
 @dataclasses.dataclass
+class StackTraceElement:
+    """Information about a single stack trace element."""
+    
+    class_name: str
+    method_name: str
+    file_name: Optional[str]
+    line_number: Optional[int]
+    
+    @property
+    def fully_qualified_method(self) -> str:
+        """Get the fully qualified method name."""
+        return f"{self.class_name}.{self.method_name}"
+
+
+@dataclasses.dataclass
 class TriggeringTestInfo:
     """Information about a test that triggers a bug."""
 
@@ -46,6 +61,8 @@ class TriggeringTestInfo:
     exception_class: Optional[str]
     exception_message: Optional[str]
     source_code: Optional[str]
+    stack_trace: Optional[List[StackTraceElement]] = None
+    raw_stack_trace: Optional[str] = None
 
 
 @dataclasses.dataclass

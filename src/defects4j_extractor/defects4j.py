@@ -27,7 +27,7 @@ from rich.progress import (
     TimeRemainingColumn,
 )
 
-from .models import BugMetadata, MethodInfo, TriggeringTestInfo
+from .models import BugMetadata, MethodInfo, TriggeringTestInfo, StackTraceElement
 from .parser import (
     extract_from_file,
     find_package_name,
@@ -245,6 +245,131 @@ def _query_bug_metadata(project: str, bug_id: int) -> BugMetadata:
         triggering_tests=triggering_tests,
         relevant_tests=relevant_tests,
     )
+
+
+def _parse_stack_trace(raw_trace: str) -> List[StackTraceElement]:
+    """Parse a Java stack trace into StackTraceElement objects."""
+    stack_elements = []
+    
+    for line in raw_trace.split('\n'):
+        line = line.strip()
+        if not line or not line.startswith('at '):
+            continue
+            
+        # Remove 'at ' prefix
+        line = line[3:].strip()
+        
+        # Parse pattern like: "com.example.Class.method(Class.java:123)"
+        # or "com.example.Class.method(Unknown Source)"
+        # or "com.example.Class.method(Native Method)"
+        if '(' in line and line.endswith(')'):
+            method_part, location_part = line.rsplit('(', 1)
+            location_part = location_part[:-1]  # Remove closing parenthesis
+            
+            # Extract class and method
+            if '.' in method_part:
+                class_name, method_name = method_part.rsplit('.', 1)
+            else:
+                class_name = ""
+                method_name = method_part
+            
+            # Extract file and line number
+            file_name = None
+            line_number = None
+            
+            if location_part not in ['Unknown Source', 'Native Method']:
+                if ':' in location_part:
+                    file_name, line_str = location_part.rsplit(':', 1)
+                    try:
+                        line_number = int(line_str)
+                    except ValueError:
+                        line_number = None
+                else:
+                    file_name = location_part
+                    
+            stack_elements.append(StackTraceElement(
+                class_name=class_name,
+                method_name=method_name,
+                file_name=file_name,
+                line_number=line_number
+            ))
+    
+    return stack_elements
+
+
+def _run_failing_test(project: str, bug_id: int, test_class: str, test_method: str, checkout_dir: Path) -> Tuple[Optional[str], Optional[str]]:
+    """Run a specific failing test and capture its output including stack traces."""
+    console.print(f"[dim]Running failing test {test_class}::{test_method} for {project}-{bug_id}...[/dim]")
+    
+    # Use defects4j test command to run specific test
+    cmd = [
+        "defects4j",
+        "test",
+        "-t", f"{test_class}::{test_method}"
+    ]
+    
+    try:
+        code, out, err = _run_cmd(cmd, cwd=checkout_dir)
+        
+        # Combine stdout and stderr to capture all test output
+        full_output = f"{out}\n{err}".strip()
+        
+        # Extract stack trace - look for exception patterns
+        exception_output = None
+        raw_stack_trace = None
+        
+        lines = full_output.split('\n')
+        for i, line in enumerate(lines):
+            # Look for exception class names followed by colon or stack trace patterns
+            if ('Exception' in line or 'Error' in line) and (':' in line or 'at ' in lines[i+1:i+10] if i+1 < len(lines) else False):
+                # Found start of exception, capture everything until end or next test
+                exception_lines = []
+                for j in range(i, len(lines)):
+                    current_line = lines[j]
+                    # Stop if we hit another test or compilation output
+                    if any(marker in current_line.lower() for marker in ['running', 'tests run:', '--- end of']):
+                        break
+                    exception_lines.append(current_line)
+                    
+                exception_output = '\n'.join(exception_lines).strip()
+                raw_stack_trace = exception_output
+                break
+                
+        return exception_output, raw_stack_trace
+        
+    except Exception as e:
+        console.print(f"[red]Error running test {test_class}::{test_method}: {e}[/red]")
+        return None, None
+
+
+def _enhance_triggering_tests_with_stack_traces(project: str, bug_id: int, triggering_tests: List[TriggeringTestInfo], checkout_dir: Path) -> None:
+    """Enhance triggering test info with detailed stack traces."""
+    if not triggering_tests:
+        return
+        
+    console.print(f"[dim]Collecting stack traces for {len(triggering_tests)} triggering tests...[/dim]")
+    
+    for test_info in triggering_tests:
+        if not test_info.test_class or not test_info.test_method:
+            continue
+            
+        exception_output, raw_stack_trace = _run_failing_test(
+            project, bug_id, test_info.test_class, test_info.test_method, checkout_dir
+        )
+        
+        if raw_stack_trace:
+            test_info.raw_stack_trace = raw_stack_trace
+            test_info.stack_trace = _parse_stack_trace(raw_stack_trace)
+            
+            # Update exception info if we got better data from running the test
+            if exception_output and not test_info.exception_message:
+                first_line = exception_output.split('\n')[0].strip()
+                if ':' in first_line:
+                    exc_class, exc_msg = first_line.split(':', 1)
+                    test_info.exception_class = exc_class.strip()
+                    test_info.exception_message = exc_msg.strip()
+                elif 'Exception' in first_line or 'Error' in first_line:
+                    test_info.exception_class = first_line.strip()
 
 
 def _checkout_bug(project: str, bug_id: int, dest: Path, fixed: bool) -> None:
@@ -532,6 +657,11 @@ def _process_one_bug_impl(
                         _extract_test_method_code(
                             parser, fixed_test_root, missing_code_tests
                         )
+                
+                # Enhance with detailed stack traces by running the failing tests
+                _enhance_triggering_tests_with_stack_traces(
+                    project, bug_id, bug_metadata.triggering_tests, buggy
+                )
 
             # Run diff and collect results
             console.print(f"[dim]Computing method-level diff for {project}-{bug_id}...[/dim]")

@@ -30,7 +30,7 @@
 
         .grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 3fr 7fr;
             gap: 16px;
             align-items: start;
         }
@@ -61,6 +61,44 @@
         }
         .highlight {
             box-shadow: 0 0 0 2px #4c9ffe inset;
+        }
+        
+        .stack-trace {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 8px;
+            margin: 8px 0;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+        
+        .stack-trace-line {
+            margin: 2px 0;
+            padding: 1px 4px;
+            border-radius: 2px;
+        }
+        
+        .stack-trace-line.buggy-method {
+            background: #fff3cd;
+            border-left: 3px solid #ffc107;
+            font-weight: 600;
+        }
+        
+        .stack-trace-line.modified-class {
+            background: #f8d7da;
+            border-left: 3px solid #dc3545;
+            font-weight: 500;
+        }
+        
+        .exception-header {
+            font-weight: bold;
+            color: #dc3545;
+            margin-bottom: 8px;
+            padding: 4px;
+            background: #f8d7da;
+            border-radius: 4px;
         }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
@@ -126,6 +164,14 @@
                             <div><strong>${test.test_class ? test.test_class + '::' : ''}${test.test_method}</strong></div>
                             ${test.exception_class ? `<div><small>Exception: <code>${test.exception_class}</code></small></div>` : ''}
                             ${test.exception_message ? `<div><small>Message: ${escapeHtml(test.exception_message)}</small></div>` : ''}
+                            
+                            ${test.stack_trace && test.stack_trace.length > 0 ? `
+                                <details style="margin-top: 8px;">
+                                    <summary><strong>Stack Trace</strong> <small>(buggy methods highlighted)</small></summary>
+                                    ${renderStackTrace(test, metadata.classes_modified, details)}
+                                </details>
+                            ` : ''}
+                            
                             ${test.source_code ? `
                                 <details style="margin-top: 8px;">
                                     <summary>Test Source Code</summary>
@@ -233,6 +279,65 @@
             const m = sig?.method_name || '';
             const a = typeof sig?.arity === 'number' ? sig.arity : '';
             return `${p}||${c}||${m}||${a}`;
+        }
+        
+        function renderStackTrace(test, modifiedClasses, changedMethods) {
+            if (!test.stack_trace || !test.stack_trace.length) {
+                return test.raw_stack_trace ? `<pre class="stack-trace">${escapeHtml(test.raw_stack_trace)}</pre>` : '';
+            }
+            
+            // Create sets for fast lookup
+            const modifiedClassSet = new Set(modifiedClasses || []);
+            const changedMethodsSet = new Set();
+            
+            // Build set of changed method signatures
+            (changedMethods || []).forEach(method => {
+                if (method.signature) {
+                    const className = method.signature.class_qualifier;
+                    const methodName = method.signature.method_name;
+                    if (className && methodName) {
+                        changedMethodsSet.add(`${className}.${methodName}`);
+                    }
+                }
+            });
+            
+            let html = '';
+            
+            // Add exception header if available
+            if (test.exception_class) {
+                const exceptionHeader = test.exception_message 
+                    ? `${test.exception_class}: ${test.exception_message}`
+                    : test.exception_class;
+                html += `<div class="exception-header">${escapeHtml(exceptionHeader)}</div>`;
+            }
+            
+            // Render each stack trace line
+            test.stack_trace.forEach(element => {
+                const fullMethod = `${element.class_name}.${element.method_name}`;
+                let cssClass = 'stack-trace-line';
+                
+                // Check if this is a buggy method (exact match)
+                if (changedMethodsSet.has(fullMethod)) {
+                    cssClass += ' buggy-method';
+                }
+                // Check if this is in a modified class
+                else if (modifiedClassSet.has(element.class_name)) {
+                    cssClass += ' modified-class';
+                }
+                
+                // Format the line like Java stack traces
+                let location = '';
+                if (element.file_name) {
+                    location = element.line_number ? `${element.file_name}:${element.line_number}` : element.file_name;
+                } else {
+                    location = 'Unknown Source';
+                }
+                
+                const stackLine = `at ${fullMethod}(${location})`;
+                html += `<div class="${cssClass}">${escapeHtml(stackLine)}</div>`;
+            });
+            
+            return `<div class="stack-trace">${html}</div>`;
         }
         function onProjectChange() {
             loadAllBugs();
