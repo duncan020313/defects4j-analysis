@@ -5,7 +5,6 @@ Basic usage examples for the Defects4J extractor.
 This script demonstrates common usage patterns and API interactions.
 """
 
-import json
 import sys
 from pathlib import Path
 
@@ -23,7 +22,7 @@ except ImportError:
 def example_scan_directory():
     """Example: Scan a Java source directory."""
     print("📁 Example: Scanning a directory")
-    
+
     # This would scan a real Java directory
     # source_path = Path("/path/to/java/source")
     # if source_path.exists():
@@ -33,16 +32,16 @@ def example_scan_directory():
     #         file_methods = extractor.extract_from_file(parser, java_file)
     #         methods.extend(file_methods)
     #     print(f"Found {len(methods)} methods")
-    
+
     print("   (Skipped - no source directory provided)")
 
 
 def example_process_single_file():
     """Example: Process a single Java file."""
     print("📄 Example: Processing a single file")
-    
+
     # Create a sample Java file
-    sample_java = '''
+    sample_java = """
 package com.example;
 
 /**
@@ -64,22 +63,24 @@ public class Calculator {
         return a * b;
     }
 }
-'''
-    
+"""
+
     # Write to temporary file
     temp_file = Path("/tmp/Calculator.java")
     temp_file.write_text(sample_java)
-    
+
     try:
         parser = extractor.load_java_parser()
         methods = extractor.extract_from_file(parser, temp_file)
-        
+
         print(f"   Found {len(methods)} methods:")
         for method in methods:
-            print(f"   - {method.fully_qualified_name} ({len(method.parameters)} params)")
+            print(
+                f"   - {method.fully_qualified_name} ({len(method.parameters)} params)"
+            )
             if method.javadoc:
                 print(f"     JavaDoc: {method.javadoc[:50]}...")
-    
+
     finally:
         temp_file.unlink(missing_ok=True)
 
@@ -100,16 +101,16 @@ def example_api_usage():
 def main():
     print("🔧 Defects4J Extractor - Basic Usage Examples")
     print("=" * 50)
-    
+
     example_scan_directory()
     print()
-    
+
     example_process_single_file()
     print()
-    
+
     example_api_usage()
     print()
-    
+
     print("✅ Examples complete!")
     print()
     print("Next steps:")
