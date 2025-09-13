@@ -5,8 +5,12 @@ Tree-sitter parser and AST processing functionality.
 from __future__ import annotations
 
 import re
+import warnings
 from pathlib import Path
 from typing import Iterator, List, Optional, Tuple
+
+# Suppress FutureWarning from tree-sitter library
+warnings.filterwarnings("ignore", category=FutureWarning, module="tree_sitter")
 
 from tree_sitter import Language, Parser
 from tree_sitter_languages import get_language

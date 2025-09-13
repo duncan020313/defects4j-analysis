@@ -54,8 +54,8 @@ def _run_cmd(cmd: List[str], cwd: Optional[Path] = None) -> Tuple[int, str, str]
 
 
 def _defects4j_bug_ids(project: str) -> List[int]:
-    """Query available bug ids via defects4j info -p <proj>."""
-    console.print(f"[dim]Querying available bug IDs for project {project}...[/dim]")
+    """Query available active bug ids via defects4j info -p <proj>."""
+    console.print(f"[dim]Querying active bug IDs for project {project}...[/dim]")
     code, out, err = _run_cmd(["defects4j", "info", "-p", project])
     if code != 0:
         raise RuntimeError(f"defects4j info failed for {project}: {err}")
@@ -70,8 +70,36 @@ def _defects4j_bug_ids(project: str) -> List[int]:
         m = re.match(r"^(\d+)\b.*", line)
         if m:
             ids.append(int(m.group(1)))
-    console.print(f"[dim]Found {len(ids)} bug IDs for project {project}[/dim]")
+    console.print(f"[dim]Found {len(ids)} active bug IDs for project {project}[/dim]")
     return sorted(set(ids))
+
+
+def _get_active_bug_ids(project: str) -> Set[int]:
+    """Get all active bug IDs for a project from Defects4J."""
+    code, out, err = _run_cmd([
+        "defects4j", "query", "-p", project, "-q", "bug.id"
+    ])
+    if code != 0:
+        return set()
+    
+    active_ids = set()
+    for line in out.splitlines():
+        line = line.strip()
+        # Skip header line
+        if line.startswith("bug.id") or line.startswith("Bug.ID") or not line:
+            continue
+        try:
+            active_ids.add(int(line))
+        except ValueError:
+            continue
+    return active_ids
+
+
+def _is_active_bug(project: str, bug_id: int, active_bugs: Optional[Set[int]] = None) -> bool:
+    """Check if a bug is active (not deprecated) in Defects4J."""
+    if active_bugs is None:
+        active_bugs = _get_active_bug_ids(project)
+    return bug_id in active_bugs
 
 
 def _query_bug_metadata(project: str, bug_id: int) -> BugMetadata:
@@ -368,6 +396,24 @@ def preprocess_project(
     console.print(f"Parallel jobs: {jobs}, Force overwrite: {force}")
     console.print()
 
+    # Get active bugs list once to avoid repeated queries
+    console.print(f"[dim]Getting active bugs list for {project}...[/dim]")
+    active_bugs = _get_active_bug_ids(project)
+    console.print(f"[dim]Found {len(active_bugs)} active bugs total[/dim]")
+    
+    # Filter to only active bugs
+    active_ids = [bug_id for bug_id in ids if bug_id in active_bugs]
+    skipped_count = len(ids) - len(active_ids)
+    if skipped_count > 0:
+        console.print(f"[dim]Silently skipping {skipped_count} deprecated bug(s)[/dim]")
+    
+    # Update ids to only process active bugs
+    ids = active_ids
+    
+    if not ids:
+        console.print(f"[yellow]⚠[/yellow] No active bugs to process for {project}")
+        return 0
+
     # Normalize jobs
     jobs = int(jobs) if isinstance(jobs, int) else 1
     if jobs < 1:
@@ -436,8 +482,9 @@ def _process_one_bug_impl(
     if out_path.exists() and not force:
         # Skip existing
         return 0
+    
     try:
-        # First, query the bug metadata to get triggering tests
+        # Query the bug metadata to get triggering tests
         try:
             bug_metadata = _query_bug_metadata(project, bug_id)
         except Exception as meta_ex:
@@ -577,8 +624,8 @@ def _process_one_bug_impl(
             return 1
     except RuntimeError as ex:
         msg = str(ex)
-        if "deprecated bug" in msg.lower():
-            console.print(f"[yellow]⚠[/yellow] {project}-{bug_id}: deprecated bug (skipped)")
+        if "deprecated bug" in msg.lower() or "deprecated" in msg.lower():
+            # Silently skip deprecated bugs without logging
             return 0
         console.print(f"[red]✗[/red] {project}-{bug_id}: {msg}")
         if stop_on_error:
