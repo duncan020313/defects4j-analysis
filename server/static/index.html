@@ -105,12 +105,71 @@
         }
         async function showBug(project, bugId, sigKeyEnc) {
             const res = await fetch(`/api/bug/${project}/${bugId}/details`);
-            const details = await res.json();
+            const data = await res.json();
             const out = document.getElementById('bugdetail');
             const sigKey = sigKeyEnc ? decodeURIComponent(sigKeyEnc) : null;
+            
+            // Handle both old format (array) and new format (object with bug_metadata + changed_methods)
+            const details = Array.isArray(data) ? data : (data.changed_methods || []);
+            const metadata = Array.isArray(data) ? null : data.bug_metadata;
+            
             const sorted = sigKey ? [...details].sort((a,b)=> (signatureKey(a.signature) === sigKey ? -1 : 0) - (signatureKey(b.signature) === sigKey ? -1 : 0)) : details;
+            
+            // Build triggering tests section
+            let triggeringTestsHtml = '';
+            if (metadata && metadata.triggering_tests && metadata.triggering_tests.length > 0) {
+                triggeringTestsHtml = `
+                <div class="card" style="margin: 8px 0; background: #f8f9fa;">
+                    <h4>🔍 Triggering Tests</h4>
+                    ${metadata.triggering_tests.map(test => `
+                        <div style="margin: 8px 0; padding: 8px; border-left: 3px solid #dc3545; background: white;">
+                            <div><strong>${test.test_class ? test.test_class + '::' : ''}${test.test_method}</strong></div>
+                            ${test.exception_class ? `<div><small>Exception: <code>${test.exception_class}</code></small></div>` : ''}
+                            ${test.exception_message ? `<div><small>Message: ${escapeHtml(test.exception_message)}</small></div>` : ''}
+                            ${test.source_code ? `
+                                <details style="margin-top: 8px;">
+                                    <summary>Test Source Code</summary>
+                                    <pre><code class="language-java">${escapeHtml(test.source_code)}</code></pre>
+                                </details>
+                            ` : ''}
+                        </div>
+                    `).join('')}
+                </div>`;
+            }
+            
+            // Build bug metadata section
+            let metadataHtml = '';
+            if (metadata) {
+                metadataHtml = `
+                <div class="card" style="margin: 8px 0; background: #e9ecef;">
+                    <h4>📋 Bug Metadata</h4>
+                    <div><strong>Project:</strong> ${metadata.project_id || ''}</div>
+                    <div><strong>Bug ID:</strong> ${metadata.bug_id || ''}</div>
+                    ${metadata.revision_id_buggy ? `<div><strong>Buggy Revision:</strong> <code>${metadata.revision_id_buggy.substring(0, 8)}</code></div>` : ''}
+                    ${metadata.revision_id_fixed ? `<div><strong>Fixed Revision:</strong> <code>${metadata.revision_id_fixed.substring(0, 8)}</code></div>` : ''}
+                    ${metadata.classes_modified && metadata.classes_modified.length > 0 ? `
+                        <div><strong>Modified Classes:</strong></div>
+                        <ul style="margin: 4px 0;">
+                            ${metadata.classes_modified.map(cls => `<li><code>${cls}</code></li>`).join('')}
+                        </ul>
+                    ` : ''}
+                    ${metadata.relevant_tests && metadata.relevant_tests.length > 0 ? `
+                        <details>
+                            <summary><strong>Relevant Tests (${metadata.relevant_tests.length})</strong></summary>
+                            <ul style="margin: 4px 0;">
+                                ${metadata.relevant_tests.slice(0, 10).map(test => `<li><code>${test}</code></li>`).join('')}
+                                ${metadata.relevant_tests.length > 10 ? `<li><small>... and ${metadata.relevant_tests.length - 10} more</small></li>` : ''}
+                            </ul>
+                        </details>
+                    ` : ''}
+                </div>`;
+            }
+            
             out.innerHTML = `
         <div><strong>${project}-${bugId}</strong></div>
+        ${metadataHtml}
+        ${triggeringTestsHtml}
+        <h4>🔧 Changed Methods</h4>
         ${sorted.map(d => {
           const key = signatureKey(d.signature || {});
           const highlight = sigKey && key === sigKey ? ' highlight' : '';

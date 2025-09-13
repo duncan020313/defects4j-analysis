@@ -54,7 +54,22 @@ class DataStore:
         proj = self.projects.get(project)
         if not proj or bug_id not in proj:
             raise KeyError
-        return proj[bug_id]["records"]
+        records = proj[bug_id]["records"]
+        # Handle both old format (list of methods) and new format (dict with bug_metadata + changed_methods)
+        if isinstance(records, list):
+            return records
+        else:
+            return records.get("changed_methods", [])
+    
+    def bug_metadata(self, project: str, bug_id: int) -> Optional[Dict[str, Any]]:
+        proj = self.projects.get(project)
+        if not proj or bug_id not in proj:
+            raise KeyError
+        records = proj[bug_id]["records"]
+        # Handle both old format (list of methods) and new format (dict with bug_metadata + changed_methods)
+        if isinstance(records, dict):
+            return records.get("bug_metadata")
+        return None
 
     def list_all_bugs(self, project: Optional[str] = None) -> List[Dict[str, Any]]:
         rows: List[Dict[str, Any]] = []
@@ -62,10 +77,16 @@ class DataStore:
         for prj in projects:
             for bug_id, data in self.projects.get(prj, {}).items():
                 records = data.get("records") or []
+                # Handle both old format (list of methods) and new format (dict with bug_metadata + changed_methods)
+                if isinstance(records, list):
+                    method_count = len(records)
+                else:
+                    method_count = len(records.get("changed_methods", []))
+                
                 rows.append({
                     "project": prj,
                     "bug_id": bug_id,
-                    "method_count": len(records),
+                    "method_count": method_count,
                 })
         rows.sort(key=lambda r: (r["project"], r["bug_id"]))
         return rows
@@ -78,7 +99,14 @@ class DataStore:
         projects = [project] if project else list(self.projects.keys())
         for prj in projects:
             for bug_id, data in self.projects.get(prj, {}).items():
-                for rec in data["records"]:
+                records = data["records"]
+                # Handle both old format (list of methods) and new format (dict with bug_metadata + changed_methods)
+                if isinstance(records, list):
+                    methods = records
+                else:
+                    methods = records.get("changed_methods", [])
+                
+                for rec in methods:
                     sig = rec.get("signature", {})
                     file_rel_path = (sig.get("file_rel_path") or "").lower()
                     class_qualifier = (sig.get("class_qualifier") or "").lower()
@@ -135,6 +163,17 @@ def api_bug_methods(project: str, bug_id: int) -> List[Dict[str, Any]]:
         raise HTTPException(status_code=404, detail="Bug not found")
 
 
+@app.get("/api/bug/{project}/{bug_id}/metadata")
+def api_bug_metadata(project: str, bug_id: int) -> Dict[str, Any]:
+    try:
+        metadata = store.bug_metadata(project, bug_id)
+        if metadata is None:
+            return {}
+        return metadata
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Bug not found")
+
+
 def _unified_diff(a: str, b: str, from_label: str, to_label: str) -> str:
     a_lines = (a or "").splitlines(keepends=True)
     b_lines = (b or "").splitlines(keepends=True)
@@ -152,9 +191,10 @@ def _unified_diff(a: str, b: str, from_label: str, to_label: str) -> str:
 
 
 @app.get("/api/bug/{project}/{bug_id}/details")
-def api_bug_details(project: str, bug_id: int) -> List[Dict[str, Any]]:
+def api_bug_details(project: str, bug_id: int) -> Dict[str, Any]:
     try:
         records = store.bug_methods(project, bug_id)
+        metadata = store.bug_metadata(project, bug_id)
     except KeyError:
         raise HTTPException(status_code=404, detail="Bug not found")
 
@@ -180,7 +220,11 @@ def api_bug_details(project: str, bug_id: int) -> List[Dict[str, Any]]:
             "code_diff": code_diff,
             "javadoc_diff": javadoc_diff,
         })
-    return details
+    
+    return {
+        "bug_metadata": metadata or {},
+        "changed_methods": details
+    }
 
 
 @app.get("/api/search")
