@@ -55,11 +55,16 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p_pre = sub.add_parser(
         "preprocess", help="Process Defects4J bugs and build method-level diff data"
     )
+    # Default includes all 17 Defects4J projects as of v3.0.1:
+    # Chart(26), Cli(39), Closure(174), Codec(18), Collections(28), Compress(47),
+    # Csv(16), Gson(18), JacksonCore(26), JacksonDatabind(110), JacksonXml(6),
+    # Jsoup(93), JxPath(22), Lang(61), Math(106), Mockito(38), Time(26)
+    # Total: 854 active bugs across all projects
     p_pre.add_argument(
         "--projects",
         type=str,
-        default="Lang,Chart,Time,Math,Mockito",
-        help="Comma-separated list of D4J projects",
+        default="Chart,Cli,Closure,Codec,Collections,Compress,Csv,Gson,JacksonCore,JacksonDatabind,JacksonXml,Jsoup,JxPath,Lang,Math,Mockito,Time",
+        help="Comma-separated list of D4J projects (default: all 17 available projects)",
     )
     p_pre.add_argument(
         "--out",
