@@ -10,6 +10,7 @@ dependencies = [
     "tree-sitter>=0.20.0",
     "tree-sitter-languages>=1.8.0", 
     "orjson>=3.8.0",
+    "rich>=13.0.0",
     # Web server dependencies
     "fastapi>=0.100.0",
     "uvicorn[standard]>=0.20.0",

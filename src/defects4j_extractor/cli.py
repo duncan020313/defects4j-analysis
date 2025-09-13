@@ -10,8 +10,14 @@ import sys
 from pathlib import Path
 from typing import List, Optional
 
+from rich.console import Console
+from rich.panel import Panel
+from rich.text import Text
+
 from .defects4j import preprocess_project
 from .extractor import run_diff, run_scan
+
+console = Console()
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -112,24 +118,46 @@ def main(argv: Optional[List[str]] = None) -> int:
     if args.cmd == "scan":
         source_root = Path(args.source).resolve()
         if not source_root.exists():
-            print(f"Source root not found: {source_root}", file=sys.stderr)
+            console.print(f"[red]Error:[/red] Source root not found: {source_root}")
             return 2
-        count = run_scan(source_root, out_path, args.jsonl)
-        print(f"[OK] Extracted {count} methods from {source_root}", file=sys.stderr)
+        
+        console.print(Panel(
+            f"[cyan]Scanning Java source tree[/cyan]\n"
+            f"Source: {source_root}\n"
+            f"Output: {out_path or 'stdout'}\n"
+            f"Format: {'JSONL' if args.jsonl else 'JSON'}",
+            title="[bold blue]Defects4J Extractor - Scan Mode[/bold blue]"
+        ))
+        
+        with console.status("[bold green]Extracting methods..."):
+            count = run_scan(source_root, out_path, args.jsonl)
+        
+        console.print(f"[green]✓[/green] Extracted {count} methods from {source_root}")
         return 0
+        
     if args.cmd == "diff":
         buggy_root = Path(args.buggy).resolve()
         fixed_root = Path(args.fixed).resolve()
         for p in (buggy_root, fixed_root):
             if not p.exists():
-                print(f"Path not found: {p}", file=sys.stderr)
+                console.print(f"[red]Error:[/red] Path not found: {p}")
                 return 2
-        count = run_diff(buggy_root, fixed_root, out_path, args.jsonl)
-        print(
-            f"[OK] Extracted {count} methods (diff mode) from {buggy_root}",
-            file=sys.stderr,
-        )
+        
+        console.print(Panel(
+            f"[cyan]Comparing buggy and fixed source trees[/cyan]\n"
+            f"Buggy: {buggy_root}\n"
+            f"Fixed: {fixed_root}\n"
+            f"Output: {out_path or 'stdout'}\n"
+            f"Format: {'JSONL' if args.jsonl else 'JSON'}",
+            title="[bold blue]Defects4J Extractor - Diff Mode[/bold blue]"
+        ))
+        
+        with console.status("[bold green]Computing method differences..."):
+            count = run_diff(buggy_root, fixed_root, out_path, args.jsonl)
+        
+        console.print(f"[green]✓[/green] Extracted {count} changed methods")
         return 0
+        
     if args.cmd == "preprocess":
         projects = [
             x.strip()
@@ -138,8 +166,21 @@ def main(argv: Optional[List[str]] = None) -> int:
         ]
         out_dir = Path(args.out).resolve()
         out_dir.mkdir(parents=True, exist_ok=True)
+        
+        console.print(Panel(
+            f"[cyan]Preprocessing Defects4J projects[/cyan]\n"
+            f"Projects: {', '.join(projects)}\n"
+            f"Output directory: {out_dir}\n"
+            f"ID range: {args.start_id or 'auto'} to {args.end_id or 'auto'}\n"
+            f"Main source only: {args.main_only}\n"
+            f"Force overwrite: {args.force}\n"
+            f"Parallel jobs: {getattr(args, 'jobs', 1)}",
+            title="[bold blue]Defects4J Extractor - Preprocess Mode[/bold blue]"
+        ))
+        
         total = 0
         for proj in projects:
+            console.print(f"\n[bold cyan]Processing project: {proj}[/bold cyan]")
             total += preprocess_project(
                 proj,
                 out_dir,
@@ -150,7 +191,9 @@ def main(argv: Optional[List[str]] = None) -> int:
                 stop_on_error=getattr(args, "stop_on_error", False),
                 jobs=getattr(args, "jobs", 1),
             )
-        print(f"[OK] Preprocessed {total} bug(s) into {out_dir}", file=sys.stderr)
+        
+        console.print(f"\n[green]✓[/green] Preprocessed {total} bug(s) into {out_dir}")
         return 0
+        
     ap.print_help()
     return 2
