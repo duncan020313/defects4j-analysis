@@ -117,38 +117,46 @@ def _query_bug_metadata(project: str, bug_id: int) -> BugMetadata:
     if code != 0:
         raise RuntimeError(f"defects4j query failed for {project}-{bug_id}: {err}")
 
-    # Parse the CSV-like output - defects4j query returns CSV format
+    # Parse the CSV-like output - defects4j query returns CSV format without headers
     lines = out.strip().split("\n")
-    if len(lines) < 2:
-        raise RuntimeError(f"Unexpected query output for {project}-{bug_id}")
+    if not lines:
+        raise RuntimeError(f"No query output for {project}-{bug_id}")
 
-    # Find the header line and the data line for our bug
-    header_line = None
+    # Find the data line for our bug
     data_line = None
-
-    for i, line in enumerate(lines):
-        if line.startswith("bug.id") or line.startswith("Bug.ID"):
-            header_line = line
-            # Look for our bug in subsequent lines
-            for j in range(i + 1, len(lines)):
-                if lines[j].strip().startswith(str(bug_id) + ","):
-                    data_line = lines[j]
-                    break
+    for line in lines:
+        if line.strip().startswith(str(bug_id) + ","):
+            data_line = line.strip()
             break
 
-    if not header_line or not data_line:
+    if not data_line:
         raise RuntimeError(f"Bug {bug_id} not found in query results for {project}")
 
-    # Parse header and data
-    headers = [h.strip() for h in header_line.split(",")]
-    values = [v.strip() for v in data_line.split(",")]
+    # Parse the CSV line - we know the column order from our query
+    # Columns: bug.id,revision.id.buggy,revision.id.fixed,classes.modified,tests.trigger,tests.trigger.cause,tests.relevant
+    try:
+        # Handle CSV parsing for lines with potential quoted fields containing commas
+        import csv
+        import io
+        reader = csv.reader(io.StringIO(data_line))
+        values = next(reader)
+    except:
+        # Fallback to simple split if CSV parsing fails
+        values = data_line.split(",")
 
-    if len(headers) != len(values):
-        # Handle potential CSV parsing issues with commas in values
-        # For now, use a simple approach - defects4j query typically handles this
-        pass
+    if len(values) < 7:
+        raise RuntimeError(f"Unexpected query output format for {project}-{bug_id}: expected 7 columns, got {len(values)}")
 
-    data = dict(zip(headers, values))
+    # Map values to field names
+    data = {
+        "bug.id": values[0].strip(),
+        "revision.id.buggy": values[1].strip(),
+        "revision.id.fixed": values[2].strip(),
+        "classes.modified": values[3].strip(),
+        "tests.trigger": values[4].strip(),
+        "tests.trigger.cause": values[5].strip(),
+        "tests.relevant": values[6].strip(),
+    }
 
     # Extract triggering tests information
     triggering_tests = []
@@ -602,7 +610,7 @@ def _process_one_bug_impl(
                     "buggy": dataclasses.asdict(b) if b else None,
                     "fixed": dataclasses.asdict(f) if f else None,
                 }
-            diff_results.append(rec)
+                diff_results.append(rec)
 
             # Create final output with bug metadata
             final_output = {
